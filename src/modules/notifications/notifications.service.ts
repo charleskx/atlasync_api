@@ -33,7 +33,7 @@ export const notificationsService = {
         items.push({
           id: `import-${job.id}`,
           type: 'import_done',
-          title: `Importação concluída`,
+          title: 'Importação concluída',
           desc: `${job.fileName ?? 'Arquivo'} · ${parts.length ? parts.join(' · ') : 'sem alterações'}`,
           createdAt: (job.finishedAt ?? job.createdAt).toISOString(),
         })
@@ -41,7 +41,7 @@ export const notificationsService = {
         items.push({
           id: `import-${job.id}`,
           type: 'import_failed',
-          title: `Importação falhou`,
+          title: 'Importação falhou',
           desc: `${job.fileName ?? 'Arquivo'} não pôde ser processado`,
           createdAt: (job.finishedAt ?? job.createdAt).toISOString(),
         })

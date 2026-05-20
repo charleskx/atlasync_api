@@ -2,6 +2,10 @@ import { Readable } from 'node:stream'
 import ExcelJS from 'exceljs'
 import { slugify } from '../../shared/utils'
 
+const MAX_ROWS = 50_000
+const MAX_COLS = 100
+const MAX_CELL_LEN = 2_000
+
 const FIXED_COLUMNS: Record<string, string> = {
   nome: 'name',
   name: 'name',
@@ -43,19 +47,27 @@ export async function parseSpreadsheet(buffer: Buffer, filename: string): Promis
   const worksheet = workbook.worksheets[0]
   if (!worksheet) return { rows: [], errors: [] }
 
+  // Rejeita planilhas com dimensões excessivas antes de iterar
+  if (worksheet.columnCount > MAX_COLS) {
+    return { rows: [], errors: [{ line: 1, message: `A planilha excede o limite de ${MAX_COLS} colunas` }] }
+  }
+  if (worksheet.rowCount > MAX_ROWS + 1) {
+    return { rows: [], errors: [{ line: 2, message: `A planilha excede o limite de ${MAX_ROWS} linhas de dados` }] }
+  }
+
   const headers: string[] = []
   const rawRows: Record<string, unknown>[] = []
 
   worksheet.eachRow((row, rowNum) => {
     if (rowNum === 1) {
       row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-        headers[colNum - 1] = String(cell.value ?? '').trim()
+        headers[colNum - 1] = String(cell.value ?? '').slice(0, MAX_CELL_LEN).trim()
       })
     } else {
       const rowData: Record<string, unknown> = {}
       row.eachCell({ includeEmpty: true }, (cell, colNum) => {
         const header = headers[colNum - 1]
-        if (header) rowData[header] = cell.value
+        if (header) rowData[header] = String(cell.value ?? '').slice(0, MAX_CELL_LEN)
       })
       if (Object.keys(rowData).length > 0) rawRows.push(rowData)
     }

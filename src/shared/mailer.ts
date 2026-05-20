@@ -171,7 +171,7 @@ export function verifyEmailHtml(token: string, appUrl: string): string {
   const link = `${appUrl}/verify-email?token=${token}`
 
   const body = `
-    ${paragraph(`Obrigado por se cadastrar no <strong>MappaHub</strong>! Para ativar sua conta, confirme seu endereço de e-mail clicando no botão abaixo.`)}
+    ${paragraph('Obrigado por se cadastrar no <strong>MappaHub</strong>! Para ativar sua conta, confirme seu endereço de e-mail clicando no botão abaixo.')}
     ${ctaButton('Verificar meu e-mail', link)}
     <p style="margin:32px 0 0;padding:16px;background:#fef9c3;border-radius:8px;font-size:13px;color:#713f12;line-height:1.6;border:1px solid #fde68a">
       ⏱ Este link é válido por <strong>24 horas</strong>. Se você não criou uma conta no MappaHub, ignore este e-mail com segurança.

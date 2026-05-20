@@ -32,3 +32,20 @@ const schema = z.object({
 })
 
 export const env = schema.parse(process.env)
+
+// Validação de variáveis obrigatórias em produção
+if (env.NODE_ENV === 'production') {
+  const missing: string[] = []
+
+  if (!env.CORS_ORIGIN) missing.push('CORS_ORIGIN')
+  if (!env.TOTP_ENCRYPTION_KEY) missing.push('TOTP_ENCRYPTION_KEY')
+  if (!env.APP_URL.startsWith('https://')) {
+    missing.push('APP_URL (deve usar HTTPS em produção)')
+  }
+  if (env.SMTP_HOST === 'localhost') missing.push('SMTP_HOST')
+  if (!env.SMTP_PASS) missing.push('SMTP_PASS')
+
+  if (missing.length > 0) {
+    throw new Error(`[env] Variáveis obrigatórias em produção não definidas: ${missing.join(', ')}`)
+  }
+}

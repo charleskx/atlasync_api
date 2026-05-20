@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { env } from '../../config/env'
 import { authenticate } from '../../middlewares/authenticate'
+import { subscriptionGuard } from '../../middlewares/subscription-guard'
 import { AppError } from '../../shared/errors'
+
+const PLACE_ID_RE = /^[\w-]{1,512}$/
 
 type AutocompleteResult = {
   placeId: string
@@ -25,8 +28,13 @@ function getComponent(components: NewApiAddressComponent[], type: string) {
   return components.find(c => c.types.includes(type))?.longText
 }
 
+const preHandler = [authenticate, subscriptionGuard]
+
 export async function placesRoutes(app: FastifyInstance) {
-  app.get('/autocomplete', { preHandler: [authenticate] }, async req => {
+  app.get(
+    '/autocomplete',
+    { preHandler, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async req => {
     if (!env.GOOGLE_MAPS_API_KEY) {
       throw new AppError('PLACES_DISABLED', 503, 'Google Places não está configurado')
     }
@@ -84,13 +92,18 @@ export async function placesRoutes(app: FastifyInstance) {
     return { results }
   })
 
-  app.get('/details', { preHandler: [authenticate] }, async req => {
+  app.get(
+    '/details',
+    { preHandler, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async req => {
     if (!env.GOOGLE_MAPS_API_KEY) {
       throw new AppError('PLACES_DISABLED', 503, 'Google Places não está configurado')
     }
 
     const { placeId, sessiontoken } = req.query as { placeId?: string; sessiontoken?: string }
-    if (!placeId) throw new AppError('VALIDATION_ERROR', 400, 'placeId obrigatório')
+    if (!placeId || !PLACE_ID_RE.test(placeId)) {
+      throw new AppError('VALIDATION_ERROR', 400, 'placeId inválido ou ausente')
+    }
 
     // placeId is just the ID part; reconstruct the resource name "places/{id}"
     const googleUrl = new URL(`https://places.googleapis.com/v1/places/${placeId}`)

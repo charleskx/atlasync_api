@@ -12,7 +12,8 @@ export const partnerRepository = {
     const conditions = [eq(partners.tenantId, tenantId), isNull(partners.deletedAt)]
     if (search) {
       const term = `%${search}%`
-      conditions.push(or(ilike(partners.name, term), ilike(partners.address, term))!)
+      const searchCondition = or(ilike(partners.name, term), ilike(partners.address, term))
+      if (searchCondition) conditions.push(searchCondition)
     }
     if (visibility) conditions.push(eq(partners.visibility, visibility))
     if (pinTypeId) conditions.push(eq(partners.pinTypeId, pinTypeId))

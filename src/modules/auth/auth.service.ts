@@ -210,16 +210,18 @@ export const authService = {
       user = result.user
     }
 
+    if (!user) throw new AppError('INTERNAL_ERROR', 500, 'Erro interno de autenticação')
+
     const rt = makeRefreshToken()
     await authRepository.createRefreshToken({
-      userId: user!.id,
-      tenantId: user!.tenantId,
+      userId: user.id,
+      tenantId: user.tenantId,
       token: rt.hash,
       familyId: randomUUID(),
       expiresAt: dayjs().add(30, 'day').toDate(),
     })
 
-    return { user: user!, refreshToken: rt.value }
+    return { user, refreshToken: rt.value }
   },
 
   async login({ email, password }: LoginInput) {

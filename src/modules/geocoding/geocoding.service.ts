@@ -10,9 +10,11 @@ function getComponent(components: AddressComponent[], type: string): string | un
 }
 
 async function geocodeWithGoogle(address: string): Promise<FullGeoResult | null> {
+  const apiKey = env.GOOGLE_MAPS_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_MAPS_API_KEY não configurada')
   const params = new URLSearchParams({
     address,
-    key: env.GOOGLE_MAPS_API_KEY!,
+    key: apiKey,
     language: 'pt-BR',
     region: 'br',
   })

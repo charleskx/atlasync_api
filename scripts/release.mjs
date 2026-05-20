@@ -71,8 +71,8 @@ function parseCommits(raw) {
     const match = msg.match(/^(\w+)(?:\([^)]+\))?!?:\s*(.+)$/)
     if (!match) {
       // Commit sem padrão — agrupa em "outros"
-      if (!grouped['other']) grouped['other'] = []
-      grouped['other'].push(msg)
+      if (!grouped.other) grouped.other = []
+      grouped.other.push(msg)
       continue
     }
 
@@ -82,7 +82,7 @@ function parseCommits(raw) {
     if (!VISIBLE.includes(type)) continue
 
     if (!grouped[section]) grouped[section] = []
-    grouped['other'] // limpeza — não usado aqui
+    void grouped.other // limpeza — não usado aqui
     grouped[section].push(desc.charAt(0).toUpperCase() + desc.slice(1))
   }
 
@@ -93,7 +93,7 @@ function buildChangelogSection(version, date, grouped) {
   const lines = [`## [${version}] - ${date}`, '']
 
   const sectionOrder = Object.values(SECTIONS).filter(s => grouped[s]?.length)
-  if (grouped['other']?.length) sectionOrder.push('Outros')
+  if (grouped.other?.length) sectionOrder.push('Outros')
 
   if (sectionOrder.length === 0) {
     lines.push('- Melhorias e correções internas')
@@ -209,7 +209,7 @@ async function main() {
   // 6. Atualizar package.json
   step('Atualizando package.json')
   pkg.version = newVersion
-  writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+  writeFileSync('package.json', `${JSON.stringify(pkg, null, 2)}\n`)
   ok(`version: ${newVersion}`)
 
   // 7. Confirmar
@@ -224,7 +224,7 @@ async function main() {
   step('Criando commit e tag')
   run('git add CHANGELOG.md package.json')
   run(`git commit -m "chore: release v${newVersion}"`)
-  ok(`Commit criado`)
+  ok('Commit criado')
 
   run(`git tag v${newVersion}`)
   ok(`Tag v${newVersion} criada`)
@@ -239,7 +239,7 @@ async function main() {
   log('')
   log(c('green', c('bold', `✅ Release v${newVersion} publicado com sucesso!`)))
   log(c('gray', '   GitHub Actions está criando o Release e acionando o deploy no Coolify.'))
-  log(c('gray', `   Acompanhe em: https://github.com/charleskx/mappahub-api/actions`))
+  log(c('gray', '   Acompanhe em: https://github.com/charleskx/mappahub-api/actions'))
   log('')
 }
 
