@@ -1,0 +1,13 @@
+process.env.NODE_ENV = 'test'
+process.env.DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://user:pass@localhost:5432/test'
+process.env.REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379'
+process.env.JWT_SECRET =
+  process.env.JWT_SECRET ?? 'test-secret-test-secret-test-secret-123456'
+process.env.APP_URL = process.env.APP_URL ?? 'https://app.example.test'
+process.env.TOTP_ENCRYPTION_KEY =
+  process.env.TOTP_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+process.env.R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? 'test-account'
+process.env.R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID ?? 'test-access-key'
+process.env.R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? 'test-secret-key'
+process.env.R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? 'test-bucket'
+process.env.R2_PUBLIC_URL = process.env.R2_PUBLIC_URL ?? 'https://r2.example.test'

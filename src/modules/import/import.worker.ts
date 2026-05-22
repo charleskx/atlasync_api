@@ -49,10 +49,20 @@ export function createImportWorker() {
         throw new Error(`Arquivo temporário não encontrado: ${filePath}`)
       }
 
-      const { rows, errors: parseErrors } = await parseSpreadsheet(fileBuffer, fileName)
-
-      // Arquivo lido — pode deletar o temporário imediatamente
-      await cleanupTmpFile(filePath)
+      let parseResult: Awaited<ReturnType<typeof parseSpreadsheet>>
+      try {
+        parseResult = await parseSpreadsheet(fileBuffer, fileName)
+      } catch (err) {
+        await cleanupTmpFile(filePath)
+        await importRepository.update(jobId, {
+          status: 'failed',
+          errorLog: [{ row: 0, message: `Erro ao ler o arquivo: ${String(err)}` }],
+          finishedAt: new Date(),
+        })
+        emitToTenant(tenantId, { type: 'notification' })
+        return
+      }
+      const { rows, errors: parseErrors } = parseResult
 
       const [, geocodingPriority] = await Promise.all([
         importRepository.update(jobId, {
@@ -148,6 +158,7 @@ export function createImportWorker() {
         finishedAt: new Date(),
       })
 
+      await cleanupTmpFile(filePath)
       await sendImportDoneEmails({ jobId, tenantId, created, updated, removed, failed, totalRows: rows.length })
       emitToTenant(tenantId, { type: 'notification' })
     },
