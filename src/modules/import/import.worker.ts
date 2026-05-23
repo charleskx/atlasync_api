@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq'
 import { eq } from 'drizzle-orm'
-import { DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { redis } from '../../config/redis'
 import { env } from '../../config/env'
 import { db } from '../../config/database'
@@ -33,12 +33,14 @@ async function buildPinTypeCache(tenantId: string): Promise<Map<string, string>>
 }
 
 async function downloadFromR2(r2Key: string): Promise<Buffer> {
-  const publicUrl = env.R2_PUBLIC_URL
-  if (!publicUrl) throw new Error('R2_PUBLIC_URL não configurado')
-  const url = `${publicUrl}/${r2Key}`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${url}`)
-  return Buffer.from(await res.arrayBuffer())
+  const bucket = env.R2_BUCKET_NAME
+  if (!r2 || !bucket) throw new Error('R2 não configurado')
+  const response = await r2.send(new GetObjectCommand({ Bucket: bucket, Key: r2Key }))
+  const chunks: Buffer[] = []
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
 }
 
 async function deleteFromR2(r2Key: string): Promise<void> {
