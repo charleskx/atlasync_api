@@ -1,18 +1,15 @@
-import { createWriteStream } from 'node:fs'
-import { mkdir, stat, unlink } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pipeline } from 'node:stream/promises'
 import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
+import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { authenticate } from '../../middlewares/authenticate'
 import { subscriptionGuard } from '../../middlewares/subscription-guard'
 import { AppError } from '../../shared/errors'
+import { env } from '../../config/env'
+import { r2, r2Enabled } from '../../config/r2'
 import { importRepository } from './import.repository'
 import { importService } from './import.service'
 
 const IMPORT_MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
-const TMP_DIR = join(tmpdir(), 'mappahub-imports')
 
 const preHandler = [authenticate, subscriptionGuard]
 
@@ -21,6 +18,10 @@ export async function importRoutes(app: FastifyInstance) {
     '/upload',
     { preHandler, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } },
     async (req, reply) => {
+      if (!r2Enabled()) {
+        throw new AppError('R2_NOT_CONFIGURED', 503, 'Serviço de importação indisponível. Configure R2.')
+      }
+
       let data: Awaited<ReturnType<typeof req.file>>
       try {
         data = await req.file({ limits: { fileSize: IMPORT_MAX_FILE_SIZE } })
@@ -37,25 +38,29 @@ export async function importRoutes(app: FastifyInstance) {
       const query = req.query as { mode?: string }
       const mode = query.mode === 'incremental' ? 'incremental' : 'full'
 
-      // Garante que o diretório temporário existe
-      await mkdir(TMP_DIR, { recursive: true })
-
-      const tmpPath = join(TMP_DIR, `${randomUUID()}.${ext}`)
-
+      let fileBuffer: Buffer
       try {
-        // Stream do arquivo diretamente para disco — HTTP process nunca carrega o conteúdo na memória
-        await pipeline(data.file, createWriteStream(tmpPath))
-      } catch (err) {
-        await unlink(tmpPath).catch(() => {})
+        fileBuffer = await data.toBuffer()
+      } catch {
         throw new AppError('UPLOAD_ERROR', 500, 'Erro ao receber o arquivo')
       }
 
-      const { size: fileSize } = await stat(tmpPath)
+      const r2Key = `imports/${randomUUID()}.${ext}`
+
+      try {
+        await r2!.send(new PutObjectCommand({
+          Bucket: env.R2_BUCKET_NAME!,
+          Key: r2Key,
+          Body: fileBuffer,
+        }))
+      } catch {
+        throw new AppError('UPLOAD_ERROR', 500, 'Erro ao armazenar o arquivo')
+      }
 
       const result = await importService.upload(
-        tmpPath,
+        r2Key,
         data.filename,
-        fileSize,
+        fileBuffer.byteLength,
         { id: req.userId, role: req.userRole, tenantId: req.tenantId },
         mode,
       )

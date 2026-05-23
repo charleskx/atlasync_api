@@ -6,7 +6,7 @@ export type ImportJobPayload = {
   tenantId: string
   userId: string
   fileName: string
-  filePath: string   // caminho do arquivo temporário em disco
+  r2Key: string   // chave do objeto no R2 (imports/<uuid>.<ext>)
   mode: 'full' | 'incremental'
 }
 

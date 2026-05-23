@@ -7,7 +7,7 @@ type Requester = { id: string; role: string; tenantId: string }
 
 export const importService = {
   async upload(
-    filePath: string,
+    r2Key: string,
     fileName: string,
     fileSize: number,
     requester: Requester,
@@ -23,7 +23,7 @@ export const importService = {
       tenantId: requester.tenantId,
       userId: requester.id,
       fileName,
-      filePath,
+      r2Key,
       mode,
     })
 

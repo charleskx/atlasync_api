@@ -361,19 +361,19 @@ describe('partnerService', () => {
 describe('importService', () => {
   it('creates import job and queues processing', async () => {
     vi.mocked(importRepository.create).mockResolvedValue({ id: 'job1' } as never)
-    await expect(importService.upload('/tmp/file.csv', 'file.csv', 10, owner, 'incremental')).resolves.toEqual({ jobId: 'job1' })
+    await expect(importService.upload('imports/test-uuid.csv', 'file.csv', 10, owner, 'incremental')).resolves.toEqual({ jobId: 'job1' })
     expect(importQueue.add).toHaveBeenCalledWith('process', {
       jobId: 'job1',
       tenantId: 't1',
       userId: 'u1',
       fileName: 'file.csv',
-      filePath: '/tmp/file.csv',
+      r2Key: 'imports/test-uuid.csv',
       mode: 'incremental',
     })
   })
 
   it('rejects employees without import permission and missing jobs', async () => {
-    await expect(importService.upload('/tmp/file.csv', 'file.csv', 10, { ...employee, role: 'viewer' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(importService.upload('imports/test-uuid.csv', 'file.csv', 10, { ...employee, role: 'viewer' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
     vi.mocked(importRepository.findById).mockResolvedValue(null as never)
     await expect(importService.getJob('missing', owner)).rejects.toMatchObject({ code: 'JOB_NOT_FOUND' })
   })

@@ -1,10 +1,11 @@
-import { readFile, unlink } from 'node:fs/promises'
 import { Worker } from 'bullmq'
 import { eq } from 'drizzle-orm'
+import { GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { redis } from '../../config/redis'
 import { env } from '../../config/env'
 import { db } from '../../config/database'
 import { subscriptions } from '../../db/schema'
+import { r2 } from '../../config/r2'
 import { geocodingQueue } from '../../queues/geocoding.queue'
 import type { ImportJobPayload } from '../../queues/import.queue'
 import { importDoneHtml, sendMail } from '../../shared/mailer'
@@ -31,29 +32,44 @@ async function buildPinTypeCache(tenantId: string): Promise<Map<string, string>>
   return new Map(all.map(pt => [pt.name.toLowerCase(), pt.id]))
 }
 
-async function cleanupTmpFile(filePath: string): Promise<void> {
-  await unlink(filePath).catch(() => {})
+async function downloadFromR2(r2Key: string): Promise<Buffer> {
+  const response = await r2!.send(new GetObjectCommand({
+    Bucket: env.R2_BUCKET_NAME!,
+    Key: r2Key,
+  }))
+  const chunks: Buffer[] = []
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
+async function deleteFromR2(r2Key: string): Promise<void> {
+  if (!r2) return
+  await r2.send(new DeleteObjectCommand({
+    Bucket: env.R2_BUCKET_NAME!,
+    Key: r2Key,
+  })).catch(() => {})
 }
 
 export function createImportWorker() {
   const worker = new Worker<ImportJobPayload>(
     'import',
     async job => {
-      const { jobId, tenantId, filePath, fileName, mode } = job.data
+      const { jobId, tenantId, r2Key, fileName, mode } = job.data
 
-      // Lê e parseia o arquivo no worker — HTTP process nunca carregou o conteúdo
       let fileBuffer: Buffer
       try {
-        fileBuffer = await readFile(filePath)
+        fileBuffer = await downloadFromR2(r2Key)
       } catch {
-        throw new Error(`Arquivo temporário não encontrado: ${filePath}`)
+        throw new Error(`Arquivo não encontrado no armazenamento: ${r2Key}`)
       }
 
       let parseResult: Awaited<ReturnType<typeof parseSpreadsheet>>
       try {
         parseResult = await parseSpreadsheet(fileBuffer, fileName)
       } catch (err) {
-        await cleanupTmpFile(filePath)
+        await deleteFromR2(r2Key)
         await importRepository.update(jobId, {
           status: 'failed',
           errorLog: [{ row: 0, message: `Erro ao ler o arquivo: ${String(err)}` }],
@@ -158,7 +174,7 @@ export function createImportWorker() {
         finishedAt: new Date(),
       })
 
-      await cleanupTmpFile(filePath)
+      await deleteFromR2(r2Key)
       await sendImportDoneEmails({ jobId, tenantId, created, updated, removed, failed, totalRows: rows.length })
       emitToTenant(tenantId, { type: 'notification' })
     },
@@ -170,9 +186,8 @@ export function createImportWorker() {
 
   worker.on('failed', async (job: { data: ImportJobPayload } | undefined) => {
     if (!job) return
-    const { jobId, tenantId, filePath } = job.data
-    // Garante limpeza do temp mesmo em falha de BullMQ
-    await cleanupTmpFile(filePath)
+    const { jobId, tenantId, r2Key } = job.data
+    await deleteFromR2(r2Key)
     try {
       await importRepository.update(jobId, { status: 'failed', finishedAt: new Date() })
     } catch {}
