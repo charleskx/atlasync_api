@@ -1,5 +1,6 @@
 import { initSentry, Sentry } from './src/config/sentry'
 import { env } from './src/config/env'
+import { r2 } from './src/config/r2'
 import { createGeocodingWorker } from './src/modules/geocoding/geocoding.worker'
 import { createImportWorker } from './src/modules/import/import.worker'
 
@@ -7,6 +8,7 @@ initSentry()
 
 async function main() {
   console.log(`[worker] Starting in ${env.NODE_ENV} mode`)
+  console.log(`[worker] R2 configured: ${r2 !== null}, bucket: ${env.R2_BUCKET_NAME ?? 'NOT SET'}`)
 
   const importWorker = createImportWorker()
   const geocodingWorker = createGeocodingWorker()
